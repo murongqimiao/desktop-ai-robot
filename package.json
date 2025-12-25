@@ -1,0 +1,23 @@
+{
+  "name": "desktop-pet",
+  "version": "1.0.0",
+  "description": "一个基于 Electron 的桌面宠物机器人",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron -trace-warnings .",
+    "dev": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "desktop-pet",
+    "robot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}
+
