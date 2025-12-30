@@ -859,7 +859,7 @@
         });
 
         // 设置 AI 响应回调
-        asrManager.onAIResponse((userInput, aiResponse) => {
+        asrManager.onAIResponse(async (userInput, aiResponse) => {
           console.log('用户输入:', userInput);
           console.log('AI 回复:', aiResponse);
           // 可以在这里处理 AI 响应，比如显示回复或触发机器人动作
@@ -867,7 +867,23 @@
           if (aiResponse && aiResponse.trim()) {
             // 触发说话动画
             toggleSpeaking();
-            // 可以在这里添加文本转语音（TTS）功能
+            
+            // 文本转语音并播放
+            try {
+              const TTSManagerModule = await import('./tts-manager.js');
+              const ttsManager = TTSManagerModule.default;
+              
+              // 初始化 TTS（如果还没初始化）
+              if (!ttsManager.isConnected) {
+                await ttsManager.init();
+              }
+              
+              // 合成并播放语音
+              await ttsManager.speak(aiResponse);
+              console.log('TTS 播放完成');
+            } catch (error) {
+              console.error('TTS 播放失败:', error);
+            }
           }
         });
 
@@ -919,10 +935,20 @@
       }
     }, { passive: true });
 
-    // 页面加载完成后延迟初始化 ASR（不阻塞页面加载）
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        initASR();
+    // 页面加载完成后延迟初始化 ASR 和 TTS（不阻塞页面加载）
+    window.addEventListener('load', async () => {
+      setTimeout(async () => {
+        await initASR();
+        
+        // 初始化 TTS（延迟加载）
+        try {
+          const TTSManagerModule = await import('./tts-manager.js');
+          const ttsManager = TTSManagerModule.default;
+          await ttsManager.init();
+          console.log('TTS 管理器初始化完成');
+        } catch (error) {
+          console.warn('TTS 初始化失败（将在使用时重试）:', error);
+        }
       }, 2000); // 2秒后初始化，确保页面完全加载
     });
   </script>
