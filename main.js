@@ -1,6 +1,5 @@
-const { app, BrowserWindow, screen, protocol } = require('electron');
+const { app, BrowserWindow, screen } = require('electron');
 const path = require('path');
-const fs = require('fs');
 
 let mainWindow;
 let isMoving = false; // 防止递归移动
@@ -21,7 +20,8 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true
+      enableRemoteModule: true,
+      preload: path.join(__dirname, 'preload.js') // 加载 preload 脚本
     }
   });
 
@@ -44,10 +44,8 @@ function createWindow() {
   });
 }
 
-
 // 当 Electron 完成初始化并准备创建浏览器窗口时调用此方法
 app.whenReady().then(() => {
-  
   createWindow();
 
   app.on('activate', () => {

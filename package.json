@@ -4,8 +4,10 @@
   "description": "一个基于 Electron 的桌面宠物机器人",
   "main": "main.js",
   "scripts": {
-    "start": "electron -trace-warnings .",
-    "dev": "electron ."
+    "start": "concurrently -n \"ASR,Electron\" -c \"cyan,yellow\" \"npm run asr:start\" \"npm run electron:start\"",
+    "dev": "concurrently -n \"ASR,Electron\" -c \"cyan,yellow\" \"npm run asr:start\" \"npm run electron:start\"",
+    "electron:start": "electron .",
+    "asr:start": "venv/bin/python asr_server.py"
   },
   "keywords": [
     "electron",
@@ -14,10 +16,8 @@
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {
-  },
   "devDependencies": {
-    "electron": "^28.0.0"
+    "electron": "^28.0.0",
+    "concurrently": "^8.2.2"
   }
 }
-

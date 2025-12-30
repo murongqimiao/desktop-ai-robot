@@ -828,7 +828,103 @@
     const emotions = ['normal', 'happy', 'sad', 'thinking', 'cunning'];
     setEmotion(randomChoice(emotions));
 
+    // ========== ASR 语音识别集成 ==========
+    let asrManager = null;
+    let asrInitialized = false;
 
+    // 初始化 ASR（延迟加载，避免影响启动速度）
+    async function initASR() {
+      if (asrInitialized) return;
+      
+      try {
+        // 动态导入 ASR 管理器
+        const ASRManagerModule = await import('./asr-manager.js');
+        asrManager = ASRManagerModule.default;
+
+        // 设置识别结果回调
+        asrManager.onResult((text) => {
+          console.log('ASR 识别结果:', text);
+          // 可以在这里处理识别结果，比如显示在界面上或触发某些动作
+          // 例如：让机器人"说话"或做出反应
+          if (text && text.trim()) {
+            // 触发说话动画
+            toggleSpeaking();
+          }
+        });
+
+        // 设置句子完成回调
+        asrManager.onSentenceComplete((text) => {
+          console.log('句子完成:', text);
+          // 可以在这里处理完整句子（但未调用 AI 的情况）
+        });
+
+        // 设置 AI 响应回调
+        asrManager.onAIResponse((userInput, aiResponse) => {
+          console.log('用户输入:', userInput);
+          console.log('AI 回复:', aiResponse);
+          // 可以在这里处理 AI 响应，比如显示回复或触发机器人动作
+          // 例如：让机器人"说话"或做出反应
+          if (aiResponse && aiResponse.trim()) {
+            // 触发说话动画
+            toggleSpeaking();
+            // 可以在这里添加文本转语音（TTS）功能
+          }
+        });
+
+        // 设置错误回调
+        asrManager.onError((error) => {
+          console.error('ASR 错误:', error);
+        });
+
+        // 优化：初始化时预先准备连接和权限
+        await asrManager.init();
+
+        asrInitialized = true;
+        console.log('ASR 管理器初始化完成');
+      } catch (error) {
+        console.error('ASR 初始化失败:', error);
+        console.warn('ASR 功能将不可用，请确保已安装模型文件');
+      }
+    }
+
+    // 触摸/点击检测
+    let touchEvents = ['mousedown', 'touchstart', 'click'];
+    let lastTouchTime = 0;
+    const TOUCH_DEBOUNCE = 100; // 防抖：100ms 内的多次触摸只算一次
+
+    touchEvents.forEach(eventType => {
+      document.addEventListener(eventType, (e) => {
+        const now = Date.now();
+        if (now - lastTouchTime < TOUCH_DEBOUNCE) {
+          return; // 防抖
+        }
+        lastTouchTime = now;
+
+        // 初始化 ASR（如果还没初始化）
+        if (!asrInitialized) {
+          initASR();
+        }
+
+        // 通知 ASR 管理器检测到触摸
+        if (asrManager) {
+          asrManager.touchDetected();
+        }
+      }, { passive: true });
+    });
+
+    // 鼠标移动也重置休眠定时器（更自然的交互）
+    document.addEventListener('mousemove', () => {
+      if (asrManager && asrManager.isActive) {
+        asrManager.resetSleepTimer();
+      }
+    }, { passive: true });
+
+    // 页面加载完成后延迟初始化 ASR（不阻塞页面加载）
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        initASR();
+      }, 2000); // 2秒后初始化，确保页面完全加载
+    });
   </script>
 </body>
 </html>
