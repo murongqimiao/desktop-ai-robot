@@ -17,6 +17,13 @@
 
 ```bash
 npm install
+
+根目录新增一个conf目录，里面新增一个token.json文件，内容为：
+
+{
+    "deepseek_token": "这里面是你的deepseek的token"
+}
+
 ```
 
 ## ASR 语音识别功能设置
@@ -56,11 +63,18 @@ npm run dev
 desktop-ai-robot/
 ├── main.js              # Electron 主进程文件
 ├── index.html           # 机器人界面 HTML
-├── asr-manager.js       # ASR 语音识别管理器
 ├── package.json         # 项目配置文件
 ├── download-model.sh    # 模型下载脚本
 ├── ASR_SETUP.md         # ASR 功能设置指南
 ├── README.md            # 说明文档
+├── scripts/             # 前端脚本目录
+│   ├── client/          # 客户端管理器
+│   │   ├── asr-manager.js  # ASR 语音识别管理器
+│   │   └── tts-manager.js   # TTS 文本转语音管理器
+│   └── robot/           # 机器人控制脚本
+│       ├── face.js      # 面部动画控制
+│       ├── hear.js      # 听觉控制
+│       └── speak.js      # 语音控制
 └── models/              # ASR 模型目录（需要下载）
     └── vosk-model-small-cn-0.22/
 ```

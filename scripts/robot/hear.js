@@ -1,7 +1,7 @@
 // ASR 语音识别模块
 // 负责语音识别功能的初始化和事件处理
 
-import asrManager from '../../asr-manager.js';
+import asrManager from '../client/asr-manager.js';
 
 export class HearController {
   constructor(faceController) {
@@ -11,7 +11,8 @@ export class HearController {
     this.touchEvents = ['mousedown', 'touchstart', 'click'];
     this.lastTouchTime = 0;
     this.TOUCH_DEBOUNCE = 100; // 防抖：100ms 内的多次触摸只算一次
-    this.aiResponseCallback = null; // 保存 AI 响应回调
+    this.aiResponseCallback = null; // 保存 AI 响应回调（完整响应，兼容旧版本）
+    this.aiResponseStreamCallback = null; // 保存 AI 流式响应回调
   }
 
   // 初始化 ASR（延迟加载，避免影响启动速度）
@@ -47,6 +48,11 @@ export class HearController {
         this.asrManager.onAIResponse(this.aiResponseCallback);
       }
 
+      // 设置 AI 流式响应回调（如果之前已经设置过）
+      if (this.aiResponseStreamCallback) {
+        this.asrManager.onAIResponseStream(this.aiResponseStreamCallback);
+      }
+
       // 优化：初始化时预先准备连接和权限
       await this.asrManager.init();
 
@@ -66,6 +72,17 @@ export class HearController {
     // 如果 asrManager 已经初始化，立即设置
     if (this.asrManager) {
       this.asrManager.onAIResponse(callback);
+    }
+  }
+
+  // 设置 AI 流式响应回调（由外部设置，用于与 speak 模块通信）
+  setAIResponseStreamCallback(callback) {
+    // 保存回调，即使 asrManager 还没初始化
+    this.aiResponseStreamCallback = callback;
+    
+    // 如果 asrManager 已经初始化，立即设置
+    if (this.asrManager) {
+      this.asrManager.onAIResponseStream(callback);
     }
   }
 

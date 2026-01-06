@@ -53,7 +53,7 @@ desktop-ai-robot/
 
 ### 4. 更新模型路径（如需要）
 
-如果使用不同的模型，请在 `asr-manager.js` 中更新 `modelPath`：
+如果使用不同的模型，请在 `scripts/client/asr-manager.js` 中更新 `modelPath`：
 
 ```javascript
 this.modelPath = './models/vosk-model-small-cn-0.22'; // 改为你的模型路径
@@ -90,7 +90,7 @@ ASR 功能需要麦克风权限。首次使用时，浏览器会请求麦克风�
 ### 模型加载失败
 
 1. 检查模型文件是否已下载并解压到正确位置
-2. 检查 `asr-manager.js` 中的 `modelPath` 是否正确
+2. 检查 `scripts/client/asr-manager.js` 中的 `modelPath` 是否正确
 3. 查看浏览器控制台的错误信息
 
 ### 麦克风无法访问

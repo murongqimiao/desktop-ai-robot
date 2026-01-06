@@ -19,7 +19,8 @@ class ASRManager {
     this.onResultCallback = null;
     this.onErrorCallback = null;
     this.onSentenceCompleteCallback = null; // 句子完成回调
-    this.onAIResponseCallback = null; // AI 响应回调
+    this.onAIResponseCallback = null; // AI 响应回调（完整响应，兼容旧版本）
+    this.onAIResponseStreamCallback = null; // AI 流式响应回调
     this.isWebSocketReady = false; // WebSocket 是否已准备好
     this.isMicrophoneReady = false; // 麦克风是否已准备好
     this.connectionPromise = null; // WebSocket 连接 Promise（避免重复连接）
@@ -40,9 +41,14 @@ class ASRManager {
     this.onSentenceCompleteCallback = callback;
   }
 
-  // 设置 AI 响应回调
+  // 设置 AI 响应回调（完整响应，兼容旧版本）
   onAIResponse(callback) {
     this.onAIResponseCallback = callback;
+  }
+
+  // 设置 AI 流式响应回调
+  onAIResponseStream(callback) {
+    this.onAIResponseStreamCallback = callback;
   }
 
   // 连接 WebSocket 服务器（优化：避免重复连接）
@@ -96,11 +102,34 @@ class ASRManager {
                 this.onSentenceCompleteCallback(data.text);
               }
             } else if (data.type === 'ai_response') {
-              // AI 响应
+              // AI 响应（完整响应，兼容旧版本）
               console.log('AI 响应 - 用户输入:', data.user_input);
               console.log('AI 响应 - 回复:', data.response);
               if (this.onAIResponseCallback) {
                 this.onAIResponseCallback(data.user_input, data.response);
+              }
+            } else if (data.type === 'ai_response_stream_start') {
+              // 流式响应开始
+              console.log('AI 流式响应开始 - 用户输入:', data.user_input);
+              if (this.onAIResponseStreamCallback) {
+                this.onAIResponseStreamCallback('start', { user_input: data.user_input });
+              }
+            } else if (data.type === 'ai_response_stream') {
+              // 流式响应片段
+              if (this.onAIResponseStreamCallback) {
+                this.onAIResponseStreamCallback('chunk', {
+                  chunk: data.chunk,
+                  accumulated: data.accumulated
+                });
+              }
+            } else if (data.type === 'ai_response_stream_end') {
+              // 流式响应结束
+              console.log('AI 流式响应结束');
+              if (this.onAIResponseStreamCallback) {
+                this.onAIResponseStreamCallback('end', {
+                  full_text: data.full_text,
+                  error: data.error
+                });
               }
             }
           } catch (error) {

@@ -468,13 +468,37 @@
     // 初始化文本转语音控制器
     const speakController = new SpeakController(faceController);
 
-    // 设置 AI 响应回调（连接 hear 和 speak）
+    // 设置 AI 流式响应回调（连接 hear 和 speak）
+    hearController.setAIResponseStreamCallback((event, data) => {
+      if (event === 'start') {
+        console.log('AI 流式响应开始 - 用户输入:', data.user_input);
+        // 清空队列，准备接收新的流式响应
+        speakController.clearQueue();
+      } else if (event === 'chunk') {
+        // 接收到流式片段，添加到播放队列
+        if (data.chunk && data.chunk.trim()) {
+          speakController.addToQueue(data.chunk);
+        }
+      } else if (event === 'end') {
+        console.log('AI 流式响应结束');
+        if (data.error) {
+          console.error('AI 响应错误:', data.error);
+        } else if (data.full_text) {
+          console.log('完整响应:', data.full_text);
+        }
+        // 强制处理剩余缓冲区（即使没有标点符号结尾）
+        speakController.flushBuffer();
+      }
+    });
+
+    // 保留完整响应回调作为备用（兼容旧版本）
     hearController.setAIResponseCallback(async (userInput, aiResponse) => {
       console.log('用户输入:', userInput);
       console.log('AI 回复:', aiResponse);
       
       if (aiResponse && aiResponse.trim()) {
-        // 使用 speak 控制器播放 AI 回复
+        // 使用 speak 控制器播放 AI 回复（非流式）
+        speakController.clearQueue();
         await speakController.speak(aiResponse);
       }
     });

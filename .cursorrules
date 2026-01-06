@@ -1,0 +1,207 @@
+# Desktop AI Robot 项目结构说明
+
+## 项目概述
+这是一个基于 Electron 的桌面 AI 机器人项目，集成了语音识别（ASR）和文本转语音（TTS）功能。
+
+## 目录结构
+
+```
+desktop-ai-robot/
+├── python/                    # Python 后端服务
+│   ├── asr/                   # ASR 语音识别模块
+│   │   ├── __init__.py
+│   │   ├── server.py          # ASR WebSocket 服务器主程序
+│   │   ├── model_manager.py   # VOSK 模型管理
+│   │   ├── sentence_manager.py # 句子管理和断句逻辑
+│   │   ├── result_merger.py   # 中英文识别结果合并
+│   │   └── ai_client.py       # DeepSeek API 客户端
+│   ├── tts/                   # TTS 文本转语音模块
+│   │   ├── __init__.py
+│   │   ├── server.py          # TTS WebSocket 服务器主程序
+│   │   ├── engine_manager.py  # TTS 引擎管理（Edge TTS / Coqui TTS）
+│   │   └── synthesizer.py     # 文本转语音合成器
+│   ├── common/                # 公共工具模块
+│   │   ├── __init__.py
+│   │   ├── config.py          # 配置管理（路径、端口、模型等）
+│   │   └── logger.py          # 日志配置
+│   ├── start_asr.py           # ASR 服务器启动脚本
+│   └── start_tts.py           # TTS 服务器启动脚本
+├── scripts/                   # 前端 JavaScript 脚本
+│   ├── client/                # 客户端管理器
+│   │   ├── asr-manager.js     # ASR 语音识别管理器
+│   │   └── tts-manager.js     # TTS 文本转语音管理器
+│   └── robot/                 # 机器人相关脚本
+│       ├── face.js            # 面部动画控制
+│       ├── hear.js            # 听觉控制（ASR）
+│       └── speak.js           # 语音控制（TTS）
+├── models/                    # 语音模型文件
+│   └── vosk-model-small-cn-0.22/  # VOSK 中文模型
+├── conf/                      # 配置文件
+│   ├── robot/                 # 机器人配置
+│   ├── system/                # 系统配置
+│   └── token.json             # API Token 配置（DeepSeek）
+├── main.js                    # Electron 主进程
+├── preload.js                 # Electron 预加载脚本
+├── index.html                 # 主界面 HTML
+├── package.json               # Node.js 项目配置
+├── requirements.txt           # Python 依赖
+└── README.md                  # 项目说明文档
+```
+
+## 技术栈
+
+### 前端
+- **Electron**: 桌面应用框架
+- **JavaScript/ES6**: 前端逻辑
+- **WebSocket**: 与 Python 服务通信
+
+### 后端（Python）
+- **VOSK**: 离线语音识别引擎
+- **Edge TTS**: 文本转语音服务（推荐）
+- **Coqui TTS**: 备选 TTS 引擎
+- **WebSockets**: 异步 WebSocket 服务器
+- **httpx**: HTTP 客户端（用于 DeepSeek API）
+
+## 模块说明
+
+### Python 模块
+
+#### `python/common/`
+- **config.py**: 统一管理所有配置项
+  - 模型路径、服务器端口、API token 等
+  - 使用 `Path` 对象管理路径，自动计算项目根目录
+- **logger.py**: 统一日志配置
+  - 标准化的日志格式
+  - 控制台输出
+
+#### `python/asr/`
+- **server.py**: ASR WebSocket 服务器
+  - 处理音频数据流
+  - 支持中英文双语识别
+  - 自动断句和句子完成检测
+- **model_manager.py**: VOSK 模型管理
+  - 加载中文/英文模型
+  - 管理模型实例
+- **sentence_manager.py**: 句子管理
+  - 累积识别文本
+  - 检测句子结束标志
+  - 静音超时检测
+- **result_merger.py**: 结果合并
+  - 合并中英文识别结果
+  - 根据置信度选择最佳结果
+- **ai_client.py**: AI 客户端
+  - 流式调用 DeepSeek API
+  - 处理 SSE 响应
+
+#### `python/tts/`
+- **server.py**: TTS WebSocket 服务器
+  - 处理文本转语音请求
+  - 支持音色切换
+  - 流式音频输出
+- **engine_manager.py**: TTS 引擎管理
+  - 初始化 Edge TTS 或 Coqui TTS
+  - 管理音色列表缓存
+- **synthesizer.py**: 语音合成
+  - Edge TTS 流式合成
+  - Coqui TTS 合成
+  - PCM 格式转换（使用 ffmpeg）
+
+### 前端模块
+
+#### `scripts/robot/`
+- **face.js**: 机器人面部动画
+- **hear.js**: 听觉控制（ASR 集成）
+- **speak.js**: 语音控制（TTS 集成）
+
+#### `scripts/client/`
+- **asr-manager.js**: ASR 管理器
+  - WebSocket 客户端
+  - 音频采集和处理
+  - 激活/休眠状态管理
+- **tts-manager.js**: TTS 管理器
+  - WebSocket 客户端
+  - 音频播放控制
+
+## 开发规范
+
+### Python 代码规范
+1. **导入顺序**: 
+   - 标准库
+   - 第三方库
+   - 本地模块（使用 `python.` 前缀）
+2. **路径管理**: 
+   - 使用 `python.common.config` 中的路径常量
+   - 不要硬编码路径
+3. **日志**: 
+   - 使用 `python.common.logger.setup_logger()` 创建日志记录器
+   - 使用适当的日志级别（DEBUG, INFO, WARNING, ERROR）
+
+### 模块导入
+```python
+# 正确示例
+from python.common.config import ASR_HOST, ASR_PORT
+from python.common.logger import setup_logger
+from python.asr.model_manager import init_models
+
+# 错误示例（不要直接导入文件）
+import sys
+sys.path.append('..')
+from asr.model_manager import init_models
+```
+
+### 配置管理
+- 所有配置项应在 `python/common/config.py` 中定义
+- 使用 `Path` 对象管理路径，避免字符串拼接
+- 环境变量或用户配置通过 `config.py` 统一加载
+
+### 错误处理
+- 使用 try-except 捕获异常
+- 记录详细的错误日志
+- WebSocket 消息发送时使用安全发送函数（检查连接状态）
+
+## 启动方式
+
+### 开发模式
+```bash
+npm start
+```
+这会同时启动：
+- ASR 服务器（端口 8765）
+- TTS 服务器（端口 8766）
+- Electron 应用
+
+### 单独启动服务
+```bash
+# ASR 服务器
+venv/bin/python python/start_asr.py
+
+# TTS 服务器
+venv/bin/python python/start_tts.py
+```
+
+## 注意事项
+
+1. **Python 路径**: 启动脚本会自动添加项目根目录到 `sys.path`，确保模块导入正常
+2. **模型文件**: 确保 `models/` 目录下有 VOSK 模型文件
+3. **配置文件**: `conf/token.json` 用于存储 DeepSeek API token（可选）
+4. **依赖安装**: 
+   - Node.js: `npm install`
+   - Python: `pip install -r requirements.txt`
+5. **ffmpeg**: TTS 流式输出需要安装 ffmpeg（用于 MP3 转 PCM）
+
+## 扩展开发
+
+### 添加新的 ASR 功能
+1. 在 `python/asr/` 下创建新模块
+2. 在 `server.py` 中集成新功能
+3. 更新配置（如需要）
+
+### 添加新的 TTS 引擎
+1. 在 `python/tts/engine_manager.py` 中添加初始化函数
+2. 在 `python/tts/synthesizer.py` 中添加合成函数
+3. 在 `server.py` 中集成新引擎
+
+### 修改配置
+1. 在 `python/common/config.py` 中添加配置项
+2. 在相关模块中导入并使用配置
+
