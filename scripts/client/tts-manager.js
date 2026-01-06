@@ -217,27 +217,7 @@ class TTSManager {
       for (let i = 0; i < output.length; i++) {
         output[i] = 0;
       }
-      
-      // 如果缓冲区为空且状态为播放中，检查是否还有待解码的数据
-      if (this.isStreamingActive && this.audioBuffers.length === 0) {
-        // 可能传输结束了，等待一下
-        setTimeout(() => {
-          if (this.audioBuffers.length === 0 && this.pcmBuffer.length === 0) {
-            this.isStreamingActive = false;
-            console.log('流式播放完成：没有更多音频数据');
-            // 流式播放完成，通知回调（如果存在）
-            if (this.onAudioReadyCallback) {
-              // 对于流式播放，传入 null 表示播放完成（不使用 Audio 元素）
-              // 回调函数应该检查 null 并正确处理
-              try {
-                this.onAudioReadyCallback(null);
-              } catch (error) {
-                console.error('流式播放完成回调错误:', error);
-              }
-            }
-          }
-        }, 500);
-      }
+    
     }
   }
 
