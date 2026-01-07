@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import os
 import logging
+import websockets
 from typing import Optional
 
 from python.tts.engine_manager import get_engine, get_current_voice, get_edge_voices, TTS_DEFAULT_VOICE
@@ -85,6 +86,10 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
         websocket: WebSocket 连接对象
     """
     import edge_tts
+    import time
+    
+    # 记录开始时间
+    start_time = time.time()
     
     voice_name = voice or get_current_voice() or TTS_DEFAULT_VOICE
     
@@ -109,14 +114,18 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
                 logger.info(f"使用音色: {available_voice}（无法获取音色列表，使用默认）")
         
         # 发送开始消息（PCM 格式）
-        await websocket.send(json.dumps({
-            'type': 'audio_start',
-            'format': 'pcm',
-            'sample_rate': 24000,  # Edge TTS 默认采样率
-            'channels': 1,  # 单声道
-            'bits_per_sample': 16,  # 16位
-            'streaming': True  # 标记为流式
-        }))
+        try:
+            await websocket.send(json.dumps({
+                'type': 'audio_start',
+                'format': 'pcm',
+                'sample_rate': 24000,  # Edge TTS 默认采样率
+                'channels': 1,  # 单声道
+                'bits_per_sample': 16,  # 16位
+                'streaming': True  # 标记为流式
+            }))
+        except websockets.exceptions.ConnectionClosed:
+            logger.warning("WebSocket 连接已关闭，无法发送音频开始消息")
+            return
         
         # 生成语音（流式）
         communicate = edge_tts.Communicate(text, available_voice)
@@ -172,8 +181,12 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
                                 
                                 if raw_audio:
                                     # 发送 PCM 数据
-                                    await websocket.send(raw_audio)
-                                    total_size += len(raw_audio)
+                                    try:
+                                        await websocket.send(raw_audio)
+                                        total_size += len(raw_audio)
+                                    except websockets.exceptions.ConnectionClosed:
+                                        logger.warning("WebSocket 连接已关闭，停止发送音频数据")
+                                        return
                             finally:
                                 # 清理临时文件
                                 try:
@@ -206,8 +219,13 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
                     raw_audio, _ = process.communicate()
                     
                     if raw_audio:
-                        await websocket.send(raw_audio)
-                        total_size += len(raw_audio)
+                        # 发送 PCM 数据
+                        try:
+                            await websocket.send(raw_audio)
+                            total_size += len(raw_audio)
+                        except websockets.exceptions.ConnectionClosed:
+                            logger.warning("WebSocket 连接已关闭，停止发送音频数据")
+                            return
                 finally:
                     try:
                         os.unlink(mp3_path)
@@ -216,29 +234,49 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
             
         except FileNotFoundError:
             logger.error("ffmpeg 未安装，无法转换为 PCM 格式")
-            await websocket.send(json.dumps({
-                'type': 'error',
-                'message': '需要安装 ffmpeg 以支持 PCM 格式转换'
-            }))
+            try:
+                await websocket.send(json.dumps({
+                    'type': 'error',
+                    'message': '需要安装 ffmpeg 以支持 PCM 格式转换'
+                }))
+            except websockets.exceptions.ConnectionClosed:
+                logger.warning("WebSocket 连接已关闭，无法发送错误消息")
+            return
+        except websockets.exceptions.ConnectionClosed:
+            logger.warning("WebSocket 连接已关闭，停止处理")
             return
         except Exception as e:
             logger.error(f"PCM 转换失败: {e}")
             import traceback
             logger.error(f"详细错误信息:\n{traceback.format_exc()}")
-            await websocket.send(json.dumps({
-                'type': 'error',
-                'message': f'PCM 转换失败: {str(e)}'
-            }))
+            try:
+                await websocket.send(json.dumps({
+                    'type': 'error',
+                    'message': f'PCM 转换失败: {str(e)}'
+                }))
+            except websockets.exceptions.ConnectionClosed:
+                logger.warning("WebSocket 连接已关闭，无法发送错误消息")
             return
         
         # 发送结束消息
-        await websocket.send(json.dumps({
-            'type': 'audio_end',
-            'total_size': total_size
-        }))
+        try:
+            await websocket.send(json.dumps({
+                'type': 'audio_end',
+                'total_size': total_size
+            }))
+        except websockets.exceptions.ConnectionClosed:
+            logger.warning("WebSocket 连接已关闭，无法发送音频结束消息")
         
-        logger.info(f"TTS 流式发送完成（PCM 格式），总大小: {total_size} 字节")
+        # 计算耗时
+        elapsed_time = time.time() - start_time
         
+        # 蓝色console输出，显示转语音完成和耗时
+        print(f"\033[34m[TTS] 文本转语音完成，耗时: {elapsed_time:.2f}秒，音频大小: {total_size} 字节\033[0m")
+        logger.info(f"TTS 流式发送完成（PCM 格式），总大小: {total_size} 字节，耗时: {elapsed_time:.2f}秒")
+        
+    except websockets.exceptions.ConnectionClosed:
+        logger.warning("WebSocket 连接已关闭，停止处理")
+        return
     except Exception as e:
         logger.error(f"Edge TTS 流式生成失败: {e}")
         import traceback
@@ -248,8 +286,8 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
                 'type': 'error',
                 'message': f'语音生成失败: {str(e)}'
             }))
-        except:
-            pass
+        except (websockets.exceptions.ConnectionClosed, Exception):
+            logger.warning("无法发送错误消息，连接可能已关闭")
 
 
 async def text_to_speech_coqui(text: str, voice: Optional[str] = None) -> bytes:
@@ -265,7 +303,22 @@ async def text_to_speech_coqui(text: str, voice: Optional[str] = None) -> bytes:
     """
     tts_engine = get_engine()
     if not tts_engine:
+        logger.warning("TTS 引擎未初始化")
         return b''
+    
+    # 检查是否是 Coqui TTS 对象（TTS.api.TTS 实例）
+    # 如果 tts_engine 是 edge_tts 模块，不应该调用这个方法
+    try:
+        from TTS.api import TTS
+        if not isinstance(tts_engine, TTS):
+            logger.warning(f"TTS 引擎类型不正确，期望 TTS.api.TTS 实例，实际: {type(tts_engine)}")
+            return b''
+    except ImportError:
+        # 如果 TTS 库未安装，但 tts_engine 存在，可能是 edge_tts 模块
+        import edge_tts
+        if tts_engine == edge_tts:
+            logger.warning("TTS 引擎是 edge_tts 模块，不应使用 Coqui TTS 方法")
+            return b''
     
     try:
         import wave

@@ -43,18 +43,39 @@ async def handle_tts_request(websocket):
                             }))
                             continue
                         
+                        # 黄色console输出，显示接收到的文本
+                        print(f"\033[33m[TTS] 接收到文本转语音请求: {text[:100]}{'...' if len(text) > 100 else ''} (音色: {voice or '默认'})\033[0m")
                         logger.info(f"收到 TTS 请求: {text[:50]}... (音色: {voice or '默认'})")
                         
                         # 使用 Edge TTS（推荐）或 Coqui TTS
+                        import time
+                        start_time = time.time()
+                        
                         try:
                             import edge_tts
                             tts_engine = get_engine()
+                            
+                            # 检查是否是 Edge TTS 模块
                             if tts_engine == edge_tts:
-                                # Edge TTS - 流式发送
-                                await text_to_speech_edge_stream(text, voice, websocket)
+                                # Edge TTS - 流式发送（计时在函数内部处理）
+                                try:
+                                    await text_to_speech_edge_stream(text, voice, websocket)
+                                except websockets.exceptions.ConnectionClosed:
+                                    logger.warning("WebSocket 连接已关闭，停止处理 TTS 请求")
+                                    break  # 退出消息循环
+                                except Exception as e:
+                                    # Edge TTS 流式处理失败，记录错误但不fallback到Coqui
+                                    # 因为 tts_engine 是 edge_tts 模块，不是 Coqui TTS 对象
+                                    logger.error(f"Edge TTS 流式处理失败: {e}")
+                                    await websocket.send(json.dumps({
+                                        'type': 'error',
+                                        'message': f'Edge TTS 处理失败: {str(e)}'
+                                    }))
                             else:
-                                # Coqui TTS - 非流式
+                                # Coqui TTS - 非流式（tts_engine 是 TTS.api.TTS 实例）
                                 audio_data = await text_to_speech_coqui(text, voice)
+                                elapsed_time = time.time() - start_time
+                                
                                 if audio_data:
                                     await websocket.send(json.dumps({
                                         'type': 'audio_start',
@@ -65,29 +86,23 @@ async def handle_tts_request(websocket):
                                     await websocket.send(json.dumps({
                                         'type': 'audio_end'
                                     }))
+                                    
+                                    # 蓝色console输出，显示转语音完成和耗时
+                                    print(f"\033[34m[TTS] 文本转语音完成，耗时: {elapsed_time:.2f}秒，音频大小: {len(audio_data)} 字节\033[0m")
                                 else:
                                     await websocket.send(json.dumps({
                                         'type': 'error',
                                         'message': '语音生成失败'
                                     }))
-                        except:
-                            # Coqui TTS
-                            audio_data = await text_to_speech_coqui(text, voice)
-                            if audio_data:
-                                await websocket.send(json.dumps({
-                                    'type': 'audio_start',
-                                    'total_size': len(audio_data),
-                                    'format': 'wav'
-                                }))
-                                await websocket.send(audio_data)
-                                await websocket.send(json.dumps({
-                                    'type': 'audio_end'
-                                }))
-                            else:
-                                await websocket.send(json.dumps({
-                                    'type': 'error',
-                                    'message': '语音生成失败'
-                                }))
+                        except Exception as e:
+                            # 处理其他异常
+                            logger.error(f"TTS 处理异常: {e}")
+                            import traceback
+                            logger.error(f"详细错误信息:\n{traceback.format_exc()}")
+                            await websocket.send(json.dumps({
+                                'type': 'error',
+                                'message': f'TTS 处理失败: {str(e)}'
+                            }))
                     
                     elif request_type == 'list_voices':
                         # 获取可用音色列表（使用缓存）
@@ -173,7 +188,15 @@ async def main():
     
     logger.info(f"启动 TTS WebSocket 服务器: ws://{TTS_HOST}:{TTS_PORT}")
     
-    async with websockets.serve(handle_tts_request, TTS_HOST, TTS_PORT):
+    # 增加 keepalive 设置，避免长时间处理时连接断开
+    async with websockets.serve(
+        handle_tts_request, 
+        TTS_HOST, 
+        TTS_PORT,
+        ping_interval=20,  # 每20秒发送一次ping
+        ping_timeout=10,   # ping超时时间10秒
+        close_timeout=10   # 关闭超时时间10秒
+    ):
         logger.info("TTS 服务器已启动，等待连接...")
         await asyncio.Future()  # 永久运行
 

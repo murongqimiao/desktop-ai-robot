@@ -496,6 +496,9 @@ class TTSManager {
 
   // 文本转语音并播放（便捷方法）
   async speak(text, voice = null) {
+    // 绿色console输出，显示大模型返回的内容
+    console.log('%c[TTS] 大模型返回内容转语音:', 'color: #00ff00; font-weight: bold;', text);
+    
     return new Promise(async (resolve, reject) => {
       try {
         // 设置临时回调来接收音频

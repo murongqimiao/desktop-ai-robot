@@ -8,10 +8,11 @@ export class SpeakController {
     this.faceController = faceController;
     this.ttsManager = null;
     this.ttsInitialized = false;
-    this.playQueue = []; // 待播放队列
-    this.isPlaying = false; // 是否正在播放
+    this.playQueue = []; // 待播放队列（保留用于兼容旧接口）
+    this.isPlaying = false; // 是否正在播放（保留用于兼容旧接口）
     this.currentBuffer = ''; // 当前累积的文本缓冲区
     this.punctuationPattern = /[。！？；，、：\n]/; // 标点符号正则（包括换行符）
+    this.activeTTSRequests = 0; // 正在进行的TTS请求数量
   }
 
   // 初始化 TTS
@@ -74,7 +75,7 @@ export class SpeakController {
     // 按标点符号拆分
     const segments = this.splitByPunctuation(this.currentBuffer);
     
-    // 如果有完整的句子（以标点符号结尾），加入队列
+    // 如果有完整的句子（以标点符号结尾），立即发送TTS请求
     // 最后一个片段如果没有标点符号，保留在缓冲区
     if (segments.length > 0) {
       // 检查最后一个片段是否以标点符号结尾
@@ -82,40 +83,78 @@ export class SpeakController {
       const hasPunctuation = this.punctuationPattern.test(lastSegment);
       
       if (hasPunctuation) {
-        // 所有片段都完整，全部加入队列
+        // 所有片段都完整，立即发送TTS请求（不等待前一个完成）
         segments.forEach(segment => {
           if (segment.trim()) {
-            this.playQueue.push({ text: segment.trim(), voice });
+            // 立即发送TTS请求，不加入队列等待
+            this.sendTTSRequest(segment.trim(), voice);
           }
         });
         this.currentBuffer = '';
       } else {
-        // 最后一个片段不完整，保留在缓冲区
+        // 最后一个片段不完整，立即发送前面的完整片段，保留最后一个在缓冲区
         for (let i = 0; i < segments.length - 1; i++) {
           if (segments[i].trim()) {
-            this.playQueue.push({ text: segments[i].trim(), voice });
+            // 立即发送TTS请求
+            this.sendTTSRequest(segments[i].trim(), voice);
           }
         }
         this.currentBuffer = segments[segments.length - 1];
       }
     }
-    
-    // 开始播放队列
-    this.processQueue();
   }
 
   // 强制处理剩余缓冲区（流式响应结束时调用）
   flushBuffer(voice = null) {
     if (this.currentBuffer.trim()) {
-      // 将剩余缓冲区作为最后一个片段加入队列
-      this.playQueue.push({ text: this.currentBuffer.trim(), voice });
+      // 立即发送剩余缓冲区的TTS请求
+      this.sendTTSRequest(this.currentBuffer.trim(), voice);
       this.currentBuffer = '';
-      // 开始播放队列
-      this.processQueue();
     }
   }
 
-  // 处理播放队列
+  // 立即发送TTS请求（不等待前一个完成）
+  async sendTTSRequest(text, voice = null) {
+    // 确保 TTS 已初始化
+    if (!this.ttsInitialized) {
+      await this.init();
+    }
+
+    // 如果还没连接，初始化连接
+    if (!this.ttsManager.isConnected) {
+      await this.ttsManager.init();
+    }
+
+    // 增加活跃请求计数
+    this.activeTTSRequests++;
+
+    // 触发说话动画（只在第一次时触发）
+    if (this.faceController && !this.faceController.isSpeaking) {
+      this.faceController.toggleSpeaking();
+    }
+
+    // 立即发送TTS请求，不等待完成
+    this.ttsManager.speak(text, voice).then(() => {
+      // 播放完成，减少活跃请求计数
+      this.activeTTSRequests--;
+      
+      // 如果所有请求都完成了，停止说话动画
+      if (this.activeTTSRequests === 0 && this.faceController && this.faceController.isSpeaking) {
+        this.faceController.toggleSpeaking();
+      }
+    }).catch((error) => {
+      console.error('TTS 播放失败:', error);
+      // 即使失败也要减少计数
+      this.activeTTSRequests--;
+      
+      // 如果所有请求都完成了，停止说话动画
+      if (this.activeTTSRequests === 0 && this.faceController && this.faceController.isSpeaking) {
+        this.faceController.toggleSpeaking();
+      }
+    });
+  }
+
+  // 处理播放队列（保留用于兼容旧接口）
   async processQueue() {
     // 如果正在播放或队列为空，不处理
     if (this.isPlaying || this.playQueue.length === 0) {
@@ -165,6 +204,7 @@ export class SpeakController {
     this.playQueue = [];
     this.currentBuffer = '';
     this.isPlaying = false;
+    // 注意：不清空 activeTTSRequests，让正在进行的请求自然完成
   }
 
   // 播放文本（文本转语音并播放）- 兼容旧接口

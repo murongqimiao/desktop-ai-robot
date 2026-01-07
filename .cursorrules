@@ -180,7 +180,6 @@ venv/bin/python python/start_tts.py
 ```
 
 ## 注意事项
-
 1. **Python 路径**: 启动脚本会自动添加项目根目录到 `sys.path`，确保模块导入正常
 2. **模型文件**: 确保 `models/` 目录下有 VOSK 模型文件
 3. **配置文件**: `conf/token.json` 用于存储 DeepSeek API token（可选）
