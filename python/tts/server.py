@@ -15,6 +15,7 @@ from python.common.logger import setup_logger
 from python.common.config import TTS_HOST, TTS_PORT, TTS_DEFAULT_VOICE
 from python.tts.engine_manager import init_edge_tts, init_coqui_tts, get_engine, get_edge_voices, set_current_voice
 from python.tts.synthesizer import text_to_speech_edge_stream, text_to_speech_coqui
+from python.tts.text_processor import process_text
 
 # 配置日志
 logger = setup_logger(__name__)
@@ -36,16 +37,50 @@ async def handle_tts_request(websocket):
                         text = data.get('text', '')
                         voice = data.get('voice')  # 可选的音色参数
                         
+                        print(f"\n[TTS 服务器] ========== 收到 TTS 请求 ==========")
+                        print(f"[TTS 服务器] 原始请求文本: '{text}' (长度: {len(text) if text else 0}, 类型: {type(text)})")
+                        print(f"[TTS 服务器] 音色参数: {voice}")
+                        
                         if not text:
+                            print(f"[TTS 服务器] 错误: 文本内容为空")
                             await websocket.send(json.dumps({
                                 'type': 'error',
                                 'message': '文本内容为空'
                             }))
                             continue
                         
+                        # 处理文本：清理、移除表情包、提取情绪
+                        cleaned_text, emotion = process_text(text)
+                        print(f"[TTS 服务器] 处理结果 - 清理后文本: '{cleaned_text}' (长度: {len(cleaned_text) if cleaned_text else 0})")
+                        print(f"[TTS 服务器] 处理结果 - 情绪: '{emotion}'")
+                        
+                        # 如果清理后的文本为空，发送空音频响应并跳过
+                        if not cleaned_text or not cleaned_text.strip():
+                            logger.info(f"文本清理后为空，跳过 TTS 转换（原始文本: {text[:50]}...）")
+                            try:
+                                await websocket.send(json.dumps({
+                                    'type': 'audio_start',
+                                    'voice': voice or TTS_DEFAULT_VOICE,
+                                    'emotion': emotion,
+                                    'format': 'pcm',
+                                    'sample_rate': 24000,
+                                    'channels': 1,
+                                    'bits_per_sample': 16,
+                                    'streaming': True
+                                }))
+                                await websocket.send(json.dumps({
+                                    'type': 'audio_end',
+                                    'voice': voice or TTS_DEFAULT_VOICE,
+                                    'emotion': emotion,
+                                    'total_size': 0
+                                }))
+                            except websockets.exceptions.ConnectionClosed:
+                                logger.warning("WebSocket 连接已关闭")
+                            continue
+                        
                         # 黄色console输出，显示接收到的文本
-                        print(f"\033[33m[TTS] 接收到文本转语音请求: {text[:100]}{'...' if len(text) > 100 else ''} (音色: {voice or '默认'})\033[0m")
-                        logger.info(f"收到 TTS 请求: {text[:50]}... (音色: {voice or '默认'})")
+                        print(f"\033[33m[TTS] 接收到文本转语音请求: {cleaned_text[:100]}{'...' if len(cleaned_text) > 100 else ''} (音色: {voice or '默认'}, 情绪: {emotion})\033[0m")
+                        logger.info(f"收到 TTS 请求: {cleaned_text[:50]}... (音色: {voice or '默认'}, 情绪: {emotion})")
                         
                         # 使用 Edge TTS（推荐）或 Coqui TTS
                         import time
@@ -59,7 +94,7 @@ async def handle_tts_request(websocket):
                             if tts_engine == edge_tts:
                                 # Edge TTS - 流式发送（计时在函数内部处理）
                                 try:
-                                    await text_to_speech_edge_stream(text, voice, websocket)
+                                    await text_to_speech_edge_stream(cleaned_text, voice, websocket, emotion)
                                 except websockets.exceptions.ConnectionClosed:
                                     logger.warning("WebSocket 连接已关闭，停止处理 TTS 请求")
                                     break  # 退出消息循环
@@ -73,22 +108,27 @@ async def handle_tts_request(websocket):
                                     }))
                             else:
                                 # Coqui TTS - 非流式（tts_engine 是 TTS.api.TTS 实例）
-                                audio_data = await text_to_speech_coqui(text, voice)
+                                audio_data = await text_to_speech_coqui(cleaned_text, voice)
                                 elapsed_time = time.time() - start_time
                                 
                                 if audio_data:
                                     await websocket.send(json.dumps({
                                         'type': 'audio_start',
+                                        'voice': voice or TTS_DEFAULT_VOICE,
+                                        'emotion': emotion,
                                         'total_size': len(audio_data),
                                         'format': 'wav'
                                     }))
                                     await websocket.send(audio_data)
                                     await websocket.send(json.dumps({
-                                        'type': 'audio_end'
+                                        'type': 'audio_end',
+                                        'voice': voice or TTS_DEFAULT_VOICE,
+                                        'emotion': emotion,
+                                        'total_size': len(audio_data)
                                     }))
                                     
                                     # 蓝色console输出，显示转语音完成和耗时
-                                    print(f"\033[34m[TTS] 文本转语音完成，耗时: {elapsed_time:.2f}秒，音频大小: {len(audio_data)} 字节\033[0m")
+                                    print(f"\033[34m[TTS] 文本转语音完成，耗时: {elapsed_time:.2f}秒，音频大小: {len(audio_data)} 字节，情绪: {emotion}\033[0m")
                                 else:
                                     await websocket.send(json.dumps({
                                         'type': 'error',

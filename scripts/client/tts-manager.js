@@ -77,7 +77,9 @@ class TTSManager {
                 const blob = event.data instanceof Blob ? event.data : new Blob([event.data], { type: 'audio/mpeg' });
                 const audioUrl = URL.createObjectURL(blob);
                 if (this.onAudioReadyCallback) {
-                  this.onAudioReadyCallback(audioUrl);
+                  // 传递 metadata（如果有）
+                  const metadata = this.currentMetadata || { voice: null, emotion: 'normal' };
+                  this.onAudioReadyCallback(audioUrl, metadata);
                 }
               }
             } else {
@@ -88,6 +90,19 @@ class TTSManager {
                 console.log('开始接收音频数据', data.streaming ? '(流式)' : '', '格式:', data.format);
                 this.isStreaming = data.streaming || false;
                 this.audioFormat = data.format || 'pcm';
+                
+                // 保存 metadata（voice 和 emotion）
+                this.currentMetadata = {
+                  voice: data.voice || null,
+                  emotion: data.emotion || 'normal'
+                };
+                
+                // 流式模式下，立即通知开始（传递 metadata）
+                if (this.isStreaming && this.onAudioReadyCallback) {
+                  // 流式模式：立即开始播放，传递 metadata
+                  this.onAudioReadyCallback(null, this.currentMetadata);
+                }
+                
                 // 如果是 PCM 格式，保存采样率等信息
                 if (data.format === 'pcm') {
                   this.pcmSampleRate = data.sample_rate || 24000;
@@ -96,32 +111,49 @@ class TTSManager {
                 }
                 
                 if (this.isStreaming) {
-                  // 流式模式：初始化播放
+                  // 流式模式：初始化缓冲区（播放会在收到第一个音频块时自动开始）
                   this.audioChunks = [];
                   this.audioBuffers = [];
-                  await this.startStreamingPlayback();
+                  // 注意：不在这里调用 startStreamingPlayback()，避免重置播放状态
+                  // 播放会在 handleStreamingAudioChunk 中自动开始
                 } else {
                   // 非流式模式：累积音频块
                   this.audioChunks = [];
                 }
               } else if (data.type === 'audio_end') {
                 console.log('音频数据接收完成');
+                
+                // 保存结束时的 metadata
+                const metadata = {
+                  voice: data.voice || this.currentMetadata?.voice || null,
+                  emotion: data.emotion || this.currentMetadata?.emotion || 'normal'
+                };
+                
                 if (this.isStreaming) {
                   // 流式模式：结束播放
                   await this.endStreamingPlayback();
                   this.isStreaming = false;
+                  
+                  // 流式播放完成，调用回调（传递 metadata）
+                  if (this.onAudioReadyCallback) {
+                    this.onAudioReadyCallback(null, metadata);
+                  }
                 } else {
                   // 非流式模式：合并所有音频块
                   if (this.audioChunks && this.audioChunks.length > 0) {
                     const combinedAudio = new Blob(this.audioChunks, { type: `audio/${this.audioFormat || 'mpeg'}` });
                     const audioUrl = URL.createObjectURL(combinedAudio);
                     if (this.onAudioReadyCallback) {
-                      this.onAudioReadyCallback(audioUrl);
+                      // 传递 metadata
+                      this.onAudioReadyCallback(audioUrl, metadata);
                     }
                     this.audioChunks = [];
                     this.audioFormat = null;
                   }
                 }
+                
+                // 清除 metadata
+                this.currentMetadata = null;
               } else if (data.type === 'voices_list') {
                 this.availableVoices = data.voices || [];
                 console.log('可用音色列表:', this.availableVoices);
@@ -360,20 +392,16 @@ class TTSManager {
   async endStreamingPlayback() {
     // 等待所有缓冲区播放完成
     while (this.audioBuffers.length > 0 || (this.pcmBuffer && this.pcmBuffer.length > 0)) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('等待流式播放完成', this.audioBuffers.length, this.pcmBuffer.length);
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
     this.isStreamingActive = false;
     console.log('流式播放完成');
     
     // 通知播放完成（流式模式下传入 null，表示不使用 Audio 元素）
-    if (this.onAudioReadyCallback) {
-      try {
-        this.onAudioReadyCallback(null);
-      } catch (error) {
-        console.error('流式播放完成回调错误:', error);
-      }
-    }
+    // metadata 会在 audio_end 消息中传递，这里不需要再次调用
+    // 因为 audio_end 消息已经处理了回调
   }
 
   // 停止播放并清理资源
@@ -399,6 +427,11 @@ class TTSManager {
     if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
       throw new Error('TTS 服务器未连接');
     }
+
+    console.log('synthesize', text);
+    console.log('voice', voice);
+    console.log('currentVoice', this.currentVoice);
+
     
     // 发送合成请求
     this.websocket.send(JSON.stringify({

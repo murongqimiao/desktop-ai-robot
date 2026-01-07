@@ -472,12 +472,12 @@
     hearController.setAIResponseStreamCallback((event, data) => {
       if (event === 'start') {
         console.log('AI 流式响应开始 - 用户输入:', data.user_input);
-        // 清空队列，准备接收新的流式响应
-        speakController.clearQueue();
+        // 清空状态，准备接收新的流式响应
+        speakController.clear();
       } else if (event === 'chunk') {
-        // 接收到流式片段，添加到播放队列
+        // 接收到流式片段，实时添加到文本
         if (data.chunk && data.chunk.trim()) {
-          speakController.addToQueue(data.chunk);
+          speakController.addText(data.chunk);
         }
       } else if (event === 'end') {
         console.log('AI 流式响应结束');
@@ -486,8 +486,8 @@
         } else if (data.full_text) {
           console.log('完整响应:', data.full_text);
         }
-        // 强制处理剩余缓冲区（即使没有标点符号结尾）
-        speakController.flushBuffer();
+        // 标记结束，处理剩余文本
+        speakController.markEnd();
       }
     });
 
@@ -498,8 +498,9 @@
       
       if (aiResponse && aiResponse.trim()) {
         // 使用 speak 控制器播放 AI 回复（非流式）
-        speakController.clearQueue();
-        await speakController.speak(aiResponse);
+        speakController.clear();
+        speakController.addText(aiResponse);
+        speakController.markEnd();
       }
     });
 

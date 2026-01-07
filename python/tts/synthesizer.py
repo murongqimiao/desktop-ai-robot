@@ -76,7 +76,7 @@ async def text_to_speech_edge(text: str, voice: Optional[str] = None) -> bytes:
         return b''
 
 
-async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket):
+async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket, emotion: str = 'normal'):
     """
     使用 Edge TTS 进行文本转语音（流式发送 PCM 格式）
     
@@ -84,12 +84,37 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
         text: 要转换的文本
         voice: 音色名称（可选）
         websocket: WebSocket 连接对象
+        emotion: 情绪类型（可选，默认 'normal'）
     """
     import edge_tts
     import time
     
     # 记录开始时间
     start_time = time.time()
+    
+    # 检查文本是否为空（清理后可能为空）
+    if not text or not text.strip():
+        logger.warning("文本为空，跳过 TTS 转换")
+        try:
+            await websocket.send(json.dumps({
+                'type': 'audio_start',
+                'voice': voice or get_current_voice() or TTS_DEFAULT_VOICE,
+                'emotion': emotion,
+                'format': 'pcm',
+                'sample_rate': 24000,
+                'channels': 1,
+                'bits_per_sample': 16,
+                'streaming': True
+            }))
+            await websocket.send(json.dumps({
+                'type': 'audio_end',
+                'voice': voice or get_current_voice() or TTS_DEFAULT_VOICE,
+                'emotion': emotion,
+                'total_size': 0
+            }))
+        except websockets.exceptions.ConnectionClosed:
+            logger.warning("WebSocket 连接已关闭")
+        return
     
     voice_name = voice or get_current_voice() or TTS_DEFAULT_VOICE
     
@@ -113,10 +138,12 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
                 available_voice = voice_name if voice_name else TTS_DEFAULT_VOICE
                 logger.info(f"使用音色: {available_voice}（无法获取音色列表，使用默认）")
         
-        # 发送开始消息（PCM 格式）
+        # 发送开始消息（PCM 格式），包含 voice 和 emotion
         try:
             await websocket.send(json.dumps({
                 'type': 'audio_start',
+                'voice': voice_name,
+                'emotion': emotion,
                 'format': 'pcm',
                 'sample_rate': 24000,  # Edge TTS 默认采样率
                 'channels': 1,  # 单声道
@@ -258,10 +285,12 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
                 logger.warning("WebSocket 连接已关闭，无法发送错误消息")
             return
         
-        # 发送结束消息
+        # 发送结束消息，包含 voice 和 emotion
         try:
             await websocket.send(json.dumps({
                 'type': 'audio_end',
+                'voice': voice_name,
+                'emotion': emotion,
                 'total_size': total_size
             }))
         except websockets.exceptions.ConnectionClosed:
@@ -271,13 +300,29 @@ async def text_to_speech_edge_stream(text: str, voice: Optional[str], websocket)
         elapsed_time = time.time() - start_time
         
         # 蓝色console输出，显示转语音完成和耗时
-        print(f"\033[34m[TTS] 文本转语音完成，耗时: {elapsed_time:.2f}秒，音频大小: {total_size} 字节\033[0m")
-        logger.info(f"TTS 流式发送完成（PCM 格式），总大小: {total_size} 字节，耗时: {elapsed_time:.2f}秒")
+        print(f"\033[34m[TTS] 文本转语音完成，耗时: {elapsed_time:.2f}秒，音频大小: {total_size} 字节，情绪: {emotion}\033[0m")
+        logger.info(f"TTS 流式发送完成（PCM 格式），总大小: {total_size} 字节，耗时: {elapsed_time:.2f}秒，情绪: {emotion}")
         
     except websockets.exceptions.ConnectionClosed:
         logger.warning("WebSocket 连接已关闭，停止处理")
         return
     except Exception as e:
+        # 检查是否是 NoAudioReceived 错误
+        error_str = str(e)
+        if 'NoAudioReceived' in error_str or 'No audio was received' in error_str:
+            logger.warning(f"Edge TTS 未收到音频数据: {e}，文本可能为空或音色参数不正确")
+            # 发送空的音频结束消息
+            try:
+                await websocket.send(json.dumps({
+                    'type': 'audio_end',
+                    'voice': voice_name,
+                    'emotion': emotion,
+                    'total_size': 0
+                }))
+            except websockets.exceptions.ConnectionClosed:
+                logger.warning("WebSocket 连接已关闭")
+            return
+        
         logger.error(f"Edge TTS 流式生成失败: {e}")
         import traceback
         logger.error(f"详细错误信息:\n{traceback.format_exc()}")

@@ -204,3 +204,28 @@ venv/bin/python python/start_tts.py
 1. 在 `python/common/config.py` 中添加配置项
 2. 在相关模块中导入并使用配置
 
+
+### 注释规范
+1. 所有函数必须有注释，注释格式为：
+   ```python
+   def function_name(args):
+       """
+       function_name 的描述
+       """
+       return result
+   ```
+2. 所有类必须有注释，注释格式为：
+   ```python
+   class ClassName:
+       """
+       ClassName 的描述
+       """
+       def __init__(self, args):
+           """
+           __init__ 的描述
+           """
+           self.args = args
+   ```
+3. 所有变量必须有注释，注释格式为：
+   ```python
+   variable = value
