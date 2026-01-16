@@ -161,6 +161,15 @@ async def handle_audio(websocket):
                         await websocket.send(json.dumps({'type': 'ready'}))
                         mode = "双语" if use_bilingual else "中文"
                         logger.info(f"识别器已就绪 ({mode}模式)")
+                    elif data.get('type') == 'text_input':
+                        # 直接文本输入，不经过语音识别
+                        text = data.get('text', '').strip()
+                        if text:
+                            logger.info(f"收到文本输入: {text}")
+                            # 直接流式调用 DeepSeek API
+                            asyncio.create_task(call_deepseek_api_stream(text, websocket))
+                        else:
+                            logger.warning("收到空的文本输入")
                     elif data.get('type') == 'stop':
                         # 获取最终结果
                         final_text = None

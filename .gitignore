@@ -4,3 +4,5 @@ venv/
 __pycache__/
 ## 忽略 conf 目录下的 token.json 文件
 conf/token.json
+## 忽略 crash-reports.log 文件
+crash-reports.log
