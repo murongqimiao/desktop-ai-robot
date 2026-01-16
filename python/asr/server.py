@@ -142,7 +142,12 @@ async def handle_audio(websocket):
                             
                 elif isinstance(message, str):
                     # JSON 控制消息
-                    data = json.loads(message)
+                    try:
+                        data = json.loads(message)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON 解析错误: {e}, 消息内容: {message[:100]}")
+                        continue
+                    
                     if data.get('type') == 'start':
                         current_cn_recognizer = KaldiRecognizer(cn_model, ASR_SAMPLE_RATE)
                         current_cn_recognizer.SetWords(True)
@@ -166,10 +171,54 @@ async def handle_audio(websocket):
                         text = data.get('text', '').strip()
                         if text:
                             logger.info(f"收到文本输入: {text}")
+                            logger.info("准备调用 DeepSeek API...")
                             # 直接流式调用 DeepSeek API
-                            asyncio.create_task(call_deepseek_api_stream(text, websocket))
+                            # 使用 asyncio.create_task 创建任务，并添加异常处理
+                            async def call_ai_with_error_handling():
+                                """包装 AI 调用，添加异常处理"""
+                                try:
+                                    logger.info("开始执行 DeepSeek API 调用任务")
+                                    logger.info(f"准备调用 call_deepseek_api_stream，参数: text={text}, websocket={websocket}")
+                                    result = await call_deepseek_api_stream(text, websocket)
+                                    logger.info(f"DeepSeek API 调用任务完成，返回值: {result}")
+                                except Exception as e:
+                                    logger.error(f"DeepSeek API 调用任务执行失败: {e}", exc_info=True)
+                                    import traceback
+                                    logger.error(f"异常堆栈: {traceback.format_exc()}")
+                                    # 发送错误消息到客户端
+                                    try:
+                                        await websocket.send(json.dumps({
+                                            'type': 'ai_response_stream_end',
+                                            'error': f'AI 接口调用失败: {str(e)}'
+                                        }))
+                                    except Exception as send_error:
+                                        logger.error(f"发送错误消息失败: {send_error}")
+                            
+                            try:
+                                task = asyncio.create_task(call_ai_with_error_handling())
+                                logger.info("DeepSeek API 调用任务已创建")
+                                # 可选：将任务添加到集合中以便跟踪（如果需要）
+                                # 这里不 await，让它在后台运行
+                            except Exception as e:
+                                logger.error(f"创建 DeepSeek API 调用任务失败: {e}", exc_info=True)
+                                # 发送错误消息到客户端
+                                try:
+                                    await websocket.send(json.dumps({
+                                        'type': 'ai_response_stream_end',
+                                        'error': f'创建 AI 调用任务失败: {str(e)}'
+                                    }))
+                                except Exception:
+                                    pass
                         else:
                             logger.warning("收到空的文本输入")
+                            # 发送错误消息
+                            try:
+                                await websocket.send(json.dumps({
+                                    'type': 'ai_response_stream_end',
+                                    'error': '文本输入为空'
+                                }))
+                            except Exception:
+                                pass
                     elif data.get('type') == 'stop':
                         # 获取最终结果
                         final_text = None

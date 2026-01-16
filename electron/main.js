@@ -5,12 +5,10 @@ const fs = require('fs');
 let mainWindow;
 let isMoving = false; // 防止递归移动
 let lastPosition = { x: null, y: null }; // 记录上次位置
-const COLLAPSED_HEIGHT = 133; // 折叠高度
-const EXPANDED_HEIGHT = 550; // 展开高度
-let isExpanded = false; // 当前是否展开
+const WINDOW_HEIGHT = 550; // 固定窗口高度（展开后的高度）
 
 // 崩溃日志文件路径
-const CRASH_LOG_PATH = path.join(__dirname, 'crash-reports.log');
+const CRASH_LOG_PATH = path.join(__dirname, '../crash-reports.log');
 
 /**
  * 写入崩溃日志
@@ -85,7 +83,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     // width: 300,  // face 宽度的 1/2
     width: 600,
-    height: 133, // face 高度的 1/2
+    height: WINDOW_HEIGHT, // 固定高度，通过 CSS 控制显示内容
     transparent: true,  // 透明窗口
     frame: false,  // 无边框
     alwaysOnTop: false,  // 不总是在最上层（可根据需要调整）
@@ -99,7 +97,10 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true,
-      preload: path.join(__dirname, 'preload.js'), // 加载 preload 脚本
+      // preload 脚本路径
+      // 在开发模式下，electron-vite 会将文件构建到 out/preload/index.js
+      // __dirname 在构建后指向 out/main，所以需要正确计算相对路径
+      preload: path.join(__dirname, '../preload/index.js'), // 加载 preload 脚本
       backgroundThrottling: false, // 防止后台时渲染被节流
       offscreen: false, // 确保使用正常的渲染路径
       // 添加渲染保护选项，减少崩溃风险
@@ -111,8 +112,88 @@ function createWindow() {
     }
   });
 
-  // 加载 HTML 文件
-  mainWindow.loadFile('index.html');
+  // 加载 Vue 应用
+  // electron-vite 在开发模式下会设置 VITE_DEV_SERVER_URL
+  // 如果未打包，则认为是开发模式（即使 VITE_DEV_SERVER_URL 暂时未设置）
+  const isDev = !app.isPackaged
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL
+  
+  console.log('环境检查:', {
+    isPackaged: app.isPackaged,
+    devServerUrl: devServerUrl,
+    isDev: isDev,
+    __dirname: __dirname,
+    NODE_ENV: process.env.NODE_ENV
+  })
+  
+  if (isDev) {
+    // 开发环境：使用开发服务器 URL
+    // 如果 VITE_DEV_SERVER_URL 已设置，直接使用
+    // 如果未设置，等待一下再尝试（开发服务器可能还在启动）
+    if (devServerUrl) {
+      console.log('开发模式：加载开发服务器 URL:', devServerUrl)
+      mainWindow.loadURL(devServerUrl)
+      // 开发模式下自动打开 DevTools（分离模式，避免与透明窗口的渲染冲突）
+      mainWindow.webContents.openDevTools({ mode: 'detach' })
+    } else {
+      // VITE_DEV_SERVER_URL 未设置，可能是开发服务器还在启动
+      // 等待一下，然后尝试使用默认的开发服务器地址
+      console.warn('VITE_DEV_SERVER_URL 未设置，等待开发服务器启动...')
+      
+      // 尝试使用默认的 Vite 开发服务器地址
+      const defaultDevUrl = 'http://localhost:5173'
+      
+      // 等待开发服务器启动
+      const tryLoadDevServer = () => {
+        const http = require('http')
+        let retryCount = 0
+        const maxRetries = 20 // 最多等待 10 秒 (20 * 500ms)
+        
+        const checkServer = () => {
+          const req = http.get(defaultDevUrl, (res) => {
+            console.log('开发服务器已启动，加载 URL:', defaultDevUrl)
+            mainWindow.loadURL(defaultDevUrl)
+            // 分离模式打开 DevTools，避免与透明窗口的渲染冲突
+            mainWindow.webContents.openDevTools({ mode: 'detach' })
+          })
+          req.on('error', (err) => {
+            retryCount++
+            if (retryCount < maxRetries) {
+              // 服务器未启动，继续等待
+              console.log(`等待开发服务器启动... (${retryCount}/${maxRetries})`)
+              setTimeout(checkServer, 500)
+            } else {
+              console.error('开发服务器启动超时，尝试加载默认 URL')
+              // 超时后仍然尝试加载，可能服务器在其他端口
+              mainWindow.loadURL(defaultDevUrl)
+              // 分离模式打开 DevTools，避免与透明窗口的渲染冲突
+              mainWindow.webContents.openDevTools({ mode: 'detach' })
+            }
+          })
+          req.setTimeout(1000, () => {
+            req.destroy()
+          })
+        }
+        checkServer()
+      }
+      
+      tryLoadDevServer()
+    }
+  } else {
+    // 生产环境：加载构建后的 HTML 文件
+    // electron-vite 会将 renderer 构建到 out/renderer 目录
+    // __dirname 在构建后指向 out/main，所以需要正确计算相对路径
+    const rendererPath = path.join(__dirname, '../renderer/index.html')
+    console.log('生产模式：加载文件:', rendererPath)
+    
+    // 检查文件是否存在
+    if (!fs.existsSync(rendererPath)) {
+      console.error('Renderer 文件不存在:', rendererPath)
+      console.error('当前 __dirname:', __dirname)
+    } else {
+      mainWindow.loadFile(rendererPath)
+    }
+  }
 
   // 窗口可拖动
   mainWindow.setIgnoreMouseEvents(false);
@@ -120,19 +201,8 @@ function createWindow() {
   // 边缘吸附功能
   setupEdgeSnapping();
 
-  // 打开开发者工具（调试时使用）
-  // 使用分离式 DevTools 避免与透明窗口的渲染冲突
-  mainWindow.webContents.once('did-finish-load', () => {
-    // 等待渲染稳定后再打开 DevTools，使用分离模式减少崩溃风险
-    setTimeout(() => {
-      try {
-        // 分离式 DevTools 可以减少与透明窗口的渲染冲突
-        mainWindow.webContents.openDevTools({ mode: 'detach' });
-      } catch (error) {
-        console.error('打开 DevTools 失败:', error);
-      }
-    }, 500);
-  });
+  // 注意：DevTools 现在在加载 URL/文件时根据环境自动打开
+  // 开发模式下会在 loadURL 后自动打开，生产模式下不打开
 
   // 监听渲染进程崩溃事件
   mainWindow.webContents.on('render-process-gone', (event, details) => {
@@ -212,76 +282,13 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // 监听窗口大小变化事件，在 macOS 上重新计算阴影
-  mainWindow.on('resized', () => {
-    if (process.platform === 'darwin' && mainWindow && !mainWindow.isDestroyed()) {
-      // 延迟调用，确保渲染完成
-      setTimeout(() => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.invalidateShadow();
-        }
-      }, 50);
-    }
-  });
-
   // 监听渲染进程错误报告
   ipcMain.on('renderer-error', (event, { type, details }) => {
     console.error('收到渲染进程错误报告:', type, details);
     writeCrashLog(type, details);
   });
 
-  // 监听切换窗口高度的 IPC 消息
-  ipcMain.on('toggle-window-height', () => {
-    if (mainWindow) {
-      // 切换高度
-      isExpanded = !isExpanded;
-      const newHeight = isExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT;
-      
-      // 使用 setTimeout 确保在下一个事件循环执行，避免渲染冲突
-      setTimeout(() => {
-        if (!mainWindow) return; // 检查窗口是否还存在
-        
-        const [currentWidth, currentHeight] = mainWindow.getSize();
-        const [x, y] = mainWindow.getPosition();
-        
-        // 计算新位置（保持窗口顶部位置不变，底部扩展或收缩）
-        const heightDiff = newHeight - currentHeight;
-        let newY = y - heightDiff; // 向上调整位置，保持底部位置不变
-        
-        // 确保窗口不会移出屏幕顶部
-        const display = screen.getDisplayNearestPoint({ x, y: newY });
-        const { y: screenY } = display.workArea;
-        if (newY < screenY) {
-          newY = screenY; // 如果会移出屏幕，则保持在屏幕顶部
-        }
-        
-        // 使用 setBounds 一次性设置位置和大小，避免分别调用导致的渲染问题
-        // 这可以减少透明窗口在 macOS 上的渲染错误
-        try {
-          mainWindow.setBounds({
-            x: x,
-            y: newY,
-            width: currentWidth,
-            height: newHeight
-          });
-          
-          // macOS 上调整透明窗口大小后需要重新计算阴影，避免渲染错误
-          if (process.platform === 'darwin') {
-            // 延迟调用 invalidateShadow，确保大小调整完成
-            setTimeout(() => {
-              if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.invalidateShadow();
-              }
-            }, 100);
-          }
-          
-          console.log(`窗口高度切换为: ${newHeight}px (${isExpanded ? '展开' : '折叠'})`);
-        } catch (error) {
-          console.error('窗口大小切换失败:', error);
-        }
-      }, 0); // 延迟到下一个事件循环
-    }
-  });
+  // 注意：已移除窗口高度切换逻辑，窗口高度固定，通过 CSS 控制内容显示
 }
 
 // 初始化崩溃报告（必须在 app.whenReady() 之前）

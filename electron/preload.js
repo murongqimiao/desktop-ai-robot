@@ -10,12 +10,7 @@ const appPath = __dirname || process.cwd();
 // 将应用信息暴露给渲染进程
 const electronAPI = {
   getAppPath: () => appPath,
-  toggleWindowHeight: () => {
-    // 发送切换窗口高度的消息
-    if (ipcRenderer) {
-      ipcRenderer.send('toggle-window-height');
-    }
-  },
+  // 注意：已移除 toggleWindowHeight，窗口高度固定，通过 CSS 控制显示
   reportError: (type, details) => {
     // 发送错误报告到主进程
     if (ipcRenderer) {

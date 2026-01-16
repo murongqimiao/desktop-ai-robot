@@ -1,0 +1,397 @@
+/* 机器人脸部样式 - 完整版本 */
+
+/* 脸部轮廓 - 高宽比 2:3 (高度:宽度 = 2:3) */
+.face {
+  width: 200px;
+  height: 133px; /* 300 * 2/3 = 200 */
+  border-radius: 10px;
+  position: relative;
+  flex-shrink: 0; /* 不允许缩小 */
+  box-shadow: 
+    0 13px 40px rgba(0, 0, 0, 0.3),
+    inset 0 -7px 13px rgba(0, 0, 0, 0.1),
+    inset 0 7px 13px rgba(255, 255, 255, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  perspective: 200px;
+  transform-style: preserve-3d;
+  -webkit-app-region: no-drag; /* 允许面部区域点击，不拖动 */
+  app-region: no-drag;
+}
+
+/* 眼睛容器 - 外层 */
+.eye {
+  width: 53px;
+  height: 53px;
+  background: linear-gradient(145deg, #ffffff, #e0e0e0);
+  border-radius: 11px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%) translateZ(7px);
+  transform-style: preserve-3d;
+  transform-origin: center center;
+  z-index: 10;
+  box-shadow: 
+    inset 0 3px 10px rgba(0, 0, 0, 0.2),
+    0 3px 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: top 0.4s ease-out, left 0.4s ease-out, right 0.4s ease-out, transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-app-region: drag; /* 允许面部区域点击，不拖动 */
+  app-region: drag;
+}
+
+/* 3D变换 - 向下看（悲伤，倒梯形效果） */
+.eye.face-down {
+  top: 70%;
+  transform: translateY(-50%) translateZ(7px) rotateX(-30deg);
+}
+
+/* 3D变换 - 向上看 */
+.eye.face-up {
+  top: 30%;
+  transform: translateY(-50%) translateZ(7px) rotateX(30deg);
+}
+
+/* 3D变换 - 向左看 */
+.eye.face-left.left {
+  left: 27px;
+  transform: translateY(-50%) translateZ(7px) rotateY(-25deg);
+}
+
+.eye.face-left.right {
+  right: 53px;
+  transform: translateY(-50%) translateZ(7px) rotateY(-25deg);
+}
+
+/* 3D变换 - 向右看 */
+.eye.face-right.left {
+  left: 53px;
+  transform: translateY(-50%) translateZ(7px) rotateY(25deg);
+}
+
+.eye.face-right.right {
+  right: 27px;
+  transform: translateY(-50%) translateZ(7px) rotateY(25deg);
+}
+
+/* 3D变换 - 正常（正面） */
+.eye.face-normal {
+  top: 50%;
+  transform: translateY(-50%) translateZ(7px) rotateX(0deg) rotateY(0deg);
+}
+
+/* 眼睛位置移动 */
+.eye.position-up {
+  top: 30%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-down {
+  top: 70%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-center {
+  top: 50%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+/* 左移位置 - 两个眼睛都向左移动 */
+.eye.position-left {
+  top: 50%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-left.left {
+  left: 27px; /* 向左移动 */
+}
+
+.eye.position-left.right {
+  right: 53px; /* 向左移动（right值增大表示向左） */
+}
+
+/* 右移位置 - 两个眼睛都向右移动 */
+.eye.position-right {
+  top: 50%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-right.left {
+  left: 53px; /* 向右移动 */
+}
+
+.eye.position-right.right {
+  right: 27px; /* 向右移动（right值减小表示向右） */
+}
+
+/* 左上位置 - 两个眼睛都向左上移动 */
+.eye.position-up-left {
+  top: 30%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-up-left.left {
+  left: 27px; /* 向左移动 */
+}
+
+.eye.position-up-left.right {
+  right: 53px; /* 向左移动（right值增大表示向左） */
+}
+
+/* 右上位置 - 两个眼睛都向右上移动 */
+.eye.position-up-right {
+  top: 30%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-up-right.left {
+  left: 53px; /* 向右移动 */
+}
+
+.eye.position-up-right.right {
+  right: 27px; /* 向右移动（right值减小表示向右） */
+}
+
+/* 左下位置 - 两个眼睛都向左下移动 */
+.eye.position-down-left {
+  top: 70%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-down-left.left {
+  left: 27px; /* 向左移动 */
+}
+
+.eye.position-down-left.right {
+  right: 53px; /* 向左移动（right值增大表示向左） */
+}
+
+/* 右下位置 - 两个眼睛都向右下移动 */
+.eye.position-down-right {
+  top: 70%;
+  transform: translateY(-50%) translateZ(7px);
+}
+
+.eye.position-down-right.left {
+  left: 53px; /* 向右移动 */
+}
+
+.eye.position-down-right.right {
+  right: 27px; /* 向右移动（right值减小表示向右） */
+}
+
+/* 眨眼动画 - 通过瞳孔缩放实现 */
+@keyframes blink {
+  0% {
+    transform: translate(-50%, -50%) translateZ(3px) scaleY(1);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(-50%, -50%) translateZ(3px) scaleY(0.1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-50%, -50%) translateZ(3px) scaleY(0);
+    opacity: 0;
+  }
+  70% {
+    transform: translate(-50%, -50%) translateZ(3px) scaleY(0.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) translateZ(3px) scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* 眨眼状态 */
+.pupil.blinking {
+  animation: blink 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 左眼位置 */
+.eye.left {
+  left: 40px;
+}
+
+/* 右眼位置 */
+.eye.right {
+  right: 40px;
+}
+
+/* 瞳孔 - 内层 */
+.pupil {
+  width: 21px;
+  height: 21px;
+  background: linear-gradient(145deg, #4a5568, #1a202c);
+  border-radius: 5px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateZ(3px);
+  transform-origin: center;
+  z-index: 1;
+  box-shadow: 
+    inset 0 1px 3px rgba(0, 0, 0, 0.5),
+    0 1px 7px rgba(0, 0, 0, 0.3);
+  transition: transform 0.3s ease-out;
+}
+
+/* 眼睛移动动画 */
+.pupil.look-left {
+  transform: translate(-70%, -50%) translateZ(3px);
+}
+
+.pupil.look-right {
+  transform: translate(-30%, -50%) translateZ(3px);
+}
+
+.pupil.look-up {
+  transform: translate(-50%, -70%) translateZ(3px);
+}
+
+.pupil.look-down {
+  transform: translate(-50%, -30%) translateZ(3px);
+}
+
+.pupil.look-up-left {
+  transform: translate(-70%, -70%) translateZ(3px);
+}
+
+.pupil.look-up-right {
+  transform: translate(-30%, -70%) translateZ(3px);
+}
+
+.pupil.look-down-left {
+  transform: translate(-70%, -30%) translateZ(3px);
+}
+
+.pupil.look-down-right {
+  transform: translate(-30%, -30%) translateZ(3px);
+}
+
+.pupil.look-center {
+  transform: translate(-50%, -50%) translateZ(3px);
+}
+
+/* 转圈思考动画 */
+@keyframes think {
+  0% {
+    transform: translate(-50%, -50%) translateZ(3px) rotate(0deg) translateX(13px) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) translateZ(3px) rotate(360deg) translateX(13px) rotate(-360deg);
+  }
+}
+
+.pupil.thinking {
+  animation: think 2s linear infinite;
+}
+
+/* 瞳孔高光效果 */
+.pupil::after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 1px;
+  position: absolute;
+  top: 20%;
+  left: 25%;
+}
+
+/* 控制按钮区域 - 隐藏 */
+.controls {
+  display: none;
+}
+
+/* 嘴巴容器 */
+.mouth {
+  position: absolute;
+  bottom: 27px;
+  left: 50%;
+  transform: translateX(-50%) translateZ(3px);
+  width: 40px;
+  height: 13px;
+  z-index: 5;
+  transition: all 0.4s ease-out;
+}
+
+/* 嘴巴 - 横线（普通情绪） */
+.mouth.line {
+  height: 2px;
+  background: white;
+  border-radius: 1px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* 嘴巴 - 圆圈（狡黠） */
+.mouth.circle {
+  width: 13px;
+  height: 13px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* 嘴巴 - 向上弧线（高兴） */
+.mouth.arc-up {
+  height: 20px;
+  width: 33px;
+  border: 2px solid white;
+  border-top: none;
+  border-radius: 0 0 33px 33px;
+  background: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* 嘴巴 - 向下弧线（悲伤） */
+.mouth.arc-down {
+  height: 20px;
+  width: 33px;
+  border: 2px solid white;
+  border-bottom: none;
+  border-radius: 33px 33px 0 0;
+  background: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* 嘴巴 - 矩形（带圆角，说话时的初始状态） */
+.mouth.rectangle {
+  width: 27px;
+  height: 13px;
+  border: 2px solid white;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* 说话动画 - 从矩形到横线反复变化 */
+@keyframes speaking {
+  0%, 100% {
+    width: 27px;
+    height: 13px;
+    border-radius: 7px;
+    border: 2px solid white;
+    background: transparent;
+  }
+  50% {
+    width: 40px;
+    height: 2px;
+    border-radius: 1px;
+    border: none;
+    background: white;
+  }
+}
+
+/* 说话状态 */
+.mouth.speaking {
+  width: 27px;
+  height: 13px;
+  border: 2px solid white;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  animation: speaking 0.5s ease-in-out infinite;
+}

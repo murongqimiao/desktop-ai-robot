@@ -1,0 +1,94 @@
+.chat-history {
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 8px;
+  display: none;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  min-height: 0;
+}
+
+.window-container.expanded .chat-history {
+  display: block;
+  max-height: calc(550px - 133px - 50px);
+}
+
+.chat-history::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-history::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-history::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.chat-history::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.chat-message {
+  margin-bottom: 12px;
+  display: flex;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message.user {
+  justify-content: flex-start;
+}
+
+.chat-message.user .message-bubble {
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  border-radius: 12px 12px 12px 4px;
+  max-width: 85%;
+  word-wrap: break-word;
+}
+
+.chat-message.ai {
+  justify-content: flex-end;
+}
+
+.chat-message.ai .message-bubble {
+  background: rgba(255, 255, 255, 0.7);
+  color: #333;
+  border-radius: 12px 12px 4px 12px;
+  max-width: 85%;
+  word-wrap: break-word;
+}
+
+.message-bubble {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.chat-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  text-align: center;
+  padding: 20px;
+}
